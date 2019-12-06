@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>timetravel.detj.me
+  </title>
+	<link rel="icon" type="image/png" href="icons/alt.png" />
+  <link rel="stylesheet" type="text/css" href="/Semantic-UI/dist/semantic.min.css">
+  <link rel="stylesheet" type="text/css" href="/home.css">
+  <script src="https://code.jquery.com/jquery-latest.min.js"></script>
+  <script src="/Semantic-UI/dist/semantic.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js" integrity="sha256-VeNaFBVDhoX3H+gJ37DpT/nTuZTdjYro9yBruHjVmoQ=" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <!-- Start Header -->
+  <div class="ui attached stackable menu">
+    <div class="ui container">
+      <a class="ui active item" href="/">
+        Time Traveller
+      </a>
+    </div>
+  </div>
+  <!-- End Header -->
+
+  <!-- Start Body -->
+  <div class="ui container body">
+
+    <!-- Start Today's Date Section -->
+    <div class="with-top-margin" id="todays-date">
+        <div class="ui tiny active loader"></div>
+    </div>
+    <!-- End Today's Date Section -->
+
+    <!-- Start Today's Words Section -->
+    <div class="ui center aligned fluid segment with-top-margin">
+        <h1 class="ui header">Words of the Day</h1>
+
+      <div class="ui big message" id="words-message">
+        <div class="ui tiny active loader"></div>
+      </div>
+    </div>
+    <!-- End Today's Words Section -->
+
+    <!-- Start Check Words Section -->
+    <div class="ui center aligned fluid segment with-top-margin">
+      <h1 class="ui header">Check Words</h1>
+      <div class="ui fluid action input">
+        <input type="text" placeholder=""/>
+        <button class="ui button">Check</button>
+      </div>
+    </div>
+    <!-- End Check Words Section -->
+
+    <!-- Start Past Words Section -->
+    <div class="ui center aligned fluid segment with-top-margin">
+        <h1 class="ui header">Previous Words</h1>
+
+        <div class="ui basic buttons">
+          <button class="ui icon button" id="previous-button">
+            <i class="left chevron icon"></i>
+          </button>
+          <button class="ui button" id="page-button">
+            Page 1
+          </button>
+          <button class="ui icon button" id="next-button">
+            <i class="right chevron icon"></i>
+          </button>
+        </div>
+
+        <table class="ui celled table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Words</th>
+            </tr>
+          </thead>
+          
+          <tbody id="past-events-tbody">
+            <tr>
+              <td colspan="2">
+                <div class="ui active centered inline loader"></div>
+              </td>
+            </tr>
+          </tbody>
+
+        </table>
+      </div>
+      <!-- End Past Words Section -->
+
+  </div>
+  <!-- End Body -->
+
+
+  <script>
+    var state = {
+      pagination: {
+        perPage: 10,
+        page: 1,
+      }
+    };
+
+  $(loadTodaysWords);
+  $(loadPreviousWords);
+  $(loadTodaysTitle);
+  $(addButtonListeners);
+
+  function addButtonListeners() {
+    $('#next-button').click(function() {
+      state.pagination.page += 1;
+      loadPreviousWords();
+    });
+
+    $('#previous-button').click(function() {
+      if (state.pagination.page > 1) {
+        state.pagination.page -= 1;
+        loadPreviousWords();
+      }
+    });
+  }
+
+  function loadTodaysWords() {
+    $.ajax({
+      url: "/api/todays-words"
+    }).done(function(words) {
+      //TODO remove parsing when endpoint returns json
+      words = JSON.parse(words);
+      $('#words-message').empty();
+      $('#words-message').append(buildWordsHtml(words));
+    });
+  }
+
+  function loadPreviousWords() {
+    $.ajax({
+      url: "/api/past-words",
+      data: state.pagination
+    }).done(function(words) {
+      //TODO remove parsing when endpoint returns json
+      words = JSON.parse(words);
+      $('#past-events-tbody').empty();
+      $('#past-events-tbody').append(buildPastWordsHtml(words));
+
+      $('#page-button').empty();
+      $('#page-button').text("Page " + state.pagination.page);
+    });
+  }
+
+  function loadTodaysTitle() {
+    $.ajax({
+      url: "/api/today"
+    }).done(function(date) {
+      //TODO remove parsing when endpoint returns json
+      date = JSON.parse(date);
+      $('#todays-date').empty();
+      $('#todays-date').append(buildTodaysDateHtml(date));
+    });
+  }
+
+  function buildWordsHtml(words) {
+    return TODAYS_WORDS_TEMPLATE.replace('_WORDS_', words.join(" "));
+  }
+
+  function buildPastWordsHtml(pastWords) {
+    return _.chain(pastWords.items)
+      .map(function(entry) {
+        return PAST_WORDS_TEMPLATE
+          .replace('_WORDS_', entry.strings.join(" "))
+          .replace('_DATE_', formatDate(entry.date));
+      })
+      .value()
+      .join('');
+  }
+
+  function buildTodaysDateHtml(date) {
+    return TODAYS_DATE_TEMPLATE.replace('_DATE_', formatDate(date));
+  }
+
+  function formatDate(date) {
+    return date.day + "/" + date.month + "/" + date.year;
+  }
+
+  var TODAYS_DATE_TEMPLATE = [
+    '<h1 class="ui center aligned header">',
+    'Today\'s date is _DATE_',
+    '</h1>'
+  ].join('');
+
+  var TODAYS_WORDS_TEMPLATE = [
+    '<p>',
+    '_WORDS_',
+    '</p>'
+  ].join('');
+
+  var PAST_WORDS_TEMPLATE = [
+    '<tr>',
+    '<td>',
+    '_DATE_',
+    '</td>',
+    '<td>',
+    '_WORDS_',
+    '</td>',
+    '</tr>'
+  ].join('');
+
+  </script>
+
+</body>
+</html>
