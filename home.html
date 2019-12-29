@@ -3,7 +3,7 @@
 <head>
   <title>timetravel.detj.me
   </title>
-	<link rel="icon" type="image/png" href="icons/alt.png" />
+	<link rel="icon" type="image/png" href="images/clock.png" />
   <link rel="stylesheet" type="text/css" href="/Semantic-UI/dist/semantic.min.css">
   <link rel="stylesheet" type="text/css" href="/home.css">
   <script src="https://code.jquery.com/jquery-latest.min.js"></script>
@@ -45,8 +45,8 @@
     <div class="ui center aligned fluid segment with-top-margin">
       <h1 class="ui header">Check Words</h1>
       <div class="ui fluid action input">
-        <input type="text" placeholder=""/>
-        <button class="ui button">Check</button>
+        <input type="text" placeholder="" id="check-input"/>
+        <button class="ui button" id="check-button">Check</button>
       </div>
     </div>
     <!-- End Check Words Section -->
@@ -90,12 +90,17 @@
   </div>
   <!-- End Body -->
 
+  <!-- Start Word Check Modal -->
+  <div class="ui modal" id="modal">
+  </div>
+  <!-- End Word Check Modal -->
+
 
   <script>
     var state = {
       pagination: {
         perPage: 10,
-        page: 1,
+        page: 0,
       }
     };
 
@@ -111,19 +116,60 @@
     });
 
     $('#previous-button').click(function() {
-      if (state.pagination.page > 1) {
+      if (state.pagination.page > 0) {
         state.pagination.page -= 1;
         loadPreviousWords();
       }
     });
+
+    $('#check-button').click(checkWords);
+  }
+
+  function checkWords() {
+    var words = getInputWords();
+    console.log(words);
+    if (words.length != 0) {
+      $.ajax({
+      type: 'POST',
+      url: "/api/check",
+      data: JSON.stringify(words),
+      contentType:"application/json; charset=utf-8"
+    }).done(function(result) {
+      var header = $('#check-input').val();//the input words
+      var content = getModalContent(result);
+
+      $('#modal').replaceWith(
+        MODAL_TEMPLATE
+          .replace("_HEADER_", header)
+          .replace("_CONTENT_", content));
+
+      $('#modal').modal('show');
+    });
+    }
+  }
+
+  function getModalContent(result) {
+    if (result.status == "ERROR") {
+      return "These words do not correspond to a date";
+    } else if (result.status == "FUTURE") {
+      return "These words correspond to the future date "
+       + formatDate(result.date)
+       + "!. Please contact me and tell me how you achieved this!";
+    } else if (result.status == "PAST") {
+      return "These words correspond to the date "
+       + formatDate(result.date)
+       + " which is in the past.";
+    } else if (result.status == "PRESENT") {
+      return "These words correspond to today's date.";
+    }
+    return "Error bulding content from status: `"
+      + JSON.stringify(status) + "`";
   }
 
   function loadTodaysWords() {
     $.ajax({
       url: "/api/todays-words"
     }).done(function(words) {
-      //TODO remove parsing when endpoint returns json
-      words = JSON.parse(words);
       $('#words-message').empty();
       $('#words-message').append(buildWordsHtml(words));
     });
@@ -131,16 +177,16 @@
 
   function loadPreviousWords() {
     $.ajax({
+      type: 'POST',
       url: "/api/past-words",
-      data: state.pagination
+      data: JSON.stringify(state.pagination),
+      contentType:"application/json; charset=utf-8"
     }).done(function(words) {
-      //TODO remove parsing when endpoint returns json
-      words = JSON.parse(words);
       $('#past-events-tbody').empty();
       $('#past-events-tbody').append(buildPastWordsHtml(words));
 
       $('#page-button').empty();
-      $('#page-button').text("Page " + state.pagination.page);
+      $('#page-button').text("Page " + (state.pagination.page + 1));
     });
   }
 
@@ -148,8 +194,6 @@
     $.ajax({
       url: "/api/today"
     }).done(function(date) {
-      //TODO remove parsing when endpoint returns json
-      date = JSON.parse(date);
       $('#todays-date').empty();
       $('#todays-date').append(buildTodaysDateHtml(date));
     });
@@ -178,6 +222,10 @@
     return date.day + "/" + date.month + "/" + date.year;
   }
 
+  function getInputWords() {
+    return $('#check-input').val().trim().split(" ");
+  }
+
   var TODAYS_DATE_TEMPLATE = [
     '<h1 class="ui center aligned header">',
     'Today\'s date is _DATE_',
@@ -199,6 +247,18 @@
     '_WORDS_',
     '</td>',
     '</tr>'
+  ].join('');
+
+  var MODAL_TEMPLATE = [
+    '<div class="ui modal" id="modal">',
+    '<i class="close icon"></i>',
+    '<div class="header" id="modal-header">',
+	  '_HEADER_',
+    '</div>',
+    '<div class="content">',
+    '<p>_CONTENT_</p>',
+    '</div>',
+    '</div>'
   ].join('');
 
   </script>
